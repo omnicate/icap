@@ -10,6 +10,7 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
+	"io"
 	"log"
 	"net"
 	"net/http"
@@ -19,9 +20,9 @@ import (
 
 // Objects implementing the Handler interface can be registered
 // to serve ICAP requests.
-//
-// ServeICAP should write reply headers and data to the ResponseWriter
-// and then return.
+
+// Handler ServeICAP should write reply headers and data to the ResponseWriter
+//and then return.
 type Handler interface {
 	ServeICAP(ResponseWriter, *Request)
 }
@@ -39,17 +40,19 @@ func (f HandlerFunc) ServeICAP(w ResponseWriter, r *Request) {
 
 // A conn represents the server side of an ICAP connection.
 type conn struct {
-	remoteAddr string            // network address of remote side
-	handler    Handler           // request handler
+	remoteAddr string  // network address of remote side
+	handler    Handler // request handler
+	dictionary string
 	rwc        net.Conn          // i/o connection
 	buf        *bufio.ReadWriter // buffered rwc
 }
 
 // Create new connection from rwc.
-func newConn(rwc net.Conn, handler Handler) (c *conn, err error) {
+func newConn(rwc net.Conn, handler Handler, dictionary string) (c *conn, err error) {
 	c = new(conn)
 	c.remoteAddr = rwc.RemoteAddr().String()
 	c.handler = handler
+	c.dictionary = dictionary
 	c.rwc = rwc
 	br := bufio.NewReader(rwc)
 	bw := bufio.NewWriter(rwc)
@@ -61,7 +64,7 @@ func newConn(rwc net.Conn, handler Handler) (c *conn, err error) {
 // Read next request from connection.
 func (c *conn) readRequest() (w *respWriter, err error) {
 	var req *Request
-	if req, err = ReadRequest(c.buf); err != nil {
+	if req, err = ReadRequest(c.buf, c.dictionary); err != nil {
 		return nil, err
 	}
 
@@ -103,7 +106,9 @@ func (c *conn) serve() {
 
 	w, err := c.readRequest()
 	if err != nil {
-		log.Println("error while reading request:", err)
+		if err != io.ErrUnexpectedEOF {
+			log.Println("error while reading request:", err)
+		}
 		c.rwc.Close()
 		return
 	}
@@ -118,6 +123,7 @@ func (c *conn) serve() {
 type Server struct {
 	Addr         string  // TCP address to listen on, ":1344" if empty
 	Handler      Handler // handler to invoke
+	Dictionary   string
 	ReadTimeout  time.Duration
 	WriteTimeout time.Duration
 }
@@ -147,6 +153,11 @@ func (srv *Server) Serve(l net.Listener) error {
 		handler = DefaultServeMux
 	}
 
+	dictionary := srv.Dictionary
+	if dictionary == "" {
+		dictionary = "custom_4"
+	}
+
 	for {
 		rw, e := l.Accept()
 		if e != nil {
@@ -162,7 +173,7 @@ func (srv *Server) Serve(l net.Listener) error {
 		if srv.WriteTimeout != 0 {
 			rw.SetWriteDeadline(time.Now().Add(srv.WriteTimeout))
 		}
-		c, err := newConn(rw, handler)
+		c, err := newConn(rw, handler, dictionary)
 		if err != nil {
 			continue
 		}

@@ -13,6 +13,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"log"
 	"net/http"
 	"net/textproto"
 	"net/url"
@@ -43,7 +44,57 @@ type Request struct {
 }
 
 // ReadRequest reads and parses a request from b.
-func ReadRequest(b *bufio.ReadWriter) (req *Request, err error) {
+func ReadRequest(b *bufio.ReadWriter, d string) (req *Request, err error) {
+
+	switch d {
+	case "custom_3":
+		req, err = readRequestCustomDictionary(b)
+	default:
+		req, err = readRequest(b)
+	}
+	return
+}
+
+func readRequestCustomDictionary(b *bufio.ReadWriter) (req *Request, err error) {
+
+	tp := textproto.NewReader(b.Reader)
+	req = new(Request)
+
+	// Read first line.
+	var s string
+	s, err = tp.ReadLine()
+	if err != nil {
+		if err == io.EOF {
+			err = io.ErrUnexpectedEOF
+		}
+		return nil, err
+	}
+
+	f := strings.SplitN(s, " ", 3)
+	if len(f) < 3 {
+		return nil, &badStringError{"malformed ICAP request", s}
+	}
+	req.Method, req.RawURL, req.Proto = f[0], f[1], f[2]
+	log.Printf("req.Method: %s, req.RawURL: %s, req.Proto: %s\n", req.Method, req.RawURL, req.Proto)
+
+	req.URL, err = url.ParseRequestURI("/")
+	if err != nil {
+		return nil, err
+	}
+
+	log.Printf("req.URL: %s\n", req.URL)
+
+	req.Header, err = tp.ReadMIMEHeader()
+	log.Printf("req.Header: %+v\n", req.Header)
+	if err != nil {
+		return nil, err
+	}
+
+	fmt.Printf("Request: %+v\n", req)
+	return
+}
+
+func readRequest(b *bufio.ReadWriter) (req *Request, err error) {
 	tp := textproto.NewReader(b.Reader)
 	req = new(Request)
 
@@ -196,7 +247,6 @@ func ReadRequest(b *bufio.ReadWriter) (req *Request, err error) {
 			req.Response.Body = emptyReader(0)
 		}
 	}
-
 	return
 }
 

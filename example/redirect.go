@@ -18,7 +18,7 @@ package main
 
 import (
 	"fmt"
-	"github.com/jrossi/go-icap"
+	"github.com/omnicate/icap"
 	"net/http"
 	"os"
 )
