@@ -155,7 +155,7 @@ func (srv *Server) Serve(l net.Listener) error {
 
 	dictionary := srv.Dictionary
 	if dictionary == "" {
-		dictionary = "custom_4"
+		dictionary = "default"
 	}
 
 	for {
