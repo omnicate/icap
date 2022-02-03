@@ -13,7 +13,6 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"net/textproto"
 	"net/url"
@@ -69,28 +68,23 @@ func readRequestCustomDictionary(b *bufio.ReadWriter) (req *Request, err error) 
 		}
 		return nil, err
 	}
-
 	f := strings.SplitN(s, " ", 3)
 	if len(f) < 3 {
 		return nil, &badStringError{"malformed ICAP request", s}
 	}
 	req.Method, req.RawURL, req.Proto = f[0], f[1], f[2]
-	log.Printf("req.Method: %s, req.RawURL: %s, req.Proto: %s\n", req.Method, req.RawURL, req.Proto)
 
 	req.URL, err = url.ParseRequestURI("/")
 	if err != nil {
 		return nil, err
 	}
 
-	log.Printf("req.URL: %s\n", req.URL)
-
 	req.Header, err = tp.ReadMIMEHeader()
-	log.Printf("req.Header: %+v\n", req.Header)
 	if err != nil {
 		return nil, err
 	}
 
-	fmt.Printf("Request: %+v\n", req)
+	Debug.Printf("Request: %+v\n", req)
 	return
 }
 
@@ -247,6 +241,8 @@ func readRequest(b *bufio.ReadWriter) (req *Request, err error) {
 			req.Response.Body = emptyReader(0)
 		}
 	}
+
+	Debug.Printf("Request: %+v\n", req)
 	return
 }
 
