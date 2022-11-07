@@ -84,7 +84,6 @@ func readRequestCustomDictionary(b *bufio.ReadWriter) (req *Request, err error) 
 		return nil, err
 	}
 
-	Debug.Printf("Request: %+v\n", req)
 	return
 }
 
@@ -241,8 +240,6 @@ func readRequest(b *bufio.ReadWriter) (req *Request, err error) {
 			req.Response.Body = emptyReader(0)
 		}
 	}
-
-	Debug.Printf("Request: %+v\n", req)
 	return
 }
 
